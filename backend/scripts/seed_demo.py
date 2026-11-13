@@ -11,14 +11,25 @@ def seed():
         for role,name in [('admin','陶焙 · 实验负责人'),('analyst','梁衡 · 材料分析员'),('viewer','程砚 · 工艺观察员')]:
             if not db.scalar(select(User).where(User.email==f'{role}@beiheng.demo')):db.add(User(email=f'{role}@beiheng.demo',name=name,role=role,password_hash=hash_password('Beiheng2026!')))
         levels_a=['1180','1220','1260'];levels_b=['薄釉','厚釉']
-        for index,(code,name,means) in enumerate([('BH-INT','窑程A · 交互线索',[[49,56],[58,59],[65,60]]),('BH-ADD','窑程B · 加性对照',[[50,55],[58,63],[65,70]]),('BH-CONST','窑程C · 常量边界',[[42,42],[42,42],[42,42]])]):
+        configs=[('BH-INT','窑程A · 交互线索',[[49,56],[58,59],[65,60]],False),('BH-ADD','窑程B · 加性对照',[[50,55],[58,63],[65,70]],False),('BH-CONST','窑程C · 常量边界',[[42,42],[42,42],[42,42]],False),('BH-REP','窑程D · 仪器复测聚合',[[50,55],[58,63],[65,70]],True)]
+        for index,(code,name,means,repeated) in enumerate(configs):
             study=db.scalar(select(FactorStudy).where(FactorStudy.code==code))
             if not study:
-                study=FactorStudy(code=code,name=name,a_levels=levels_a,b_levels=levels_b,source_file=f'bh-kiln-{code.lower()}.csv',note='3温度×2釉层，每格20个随机独立陶瓷试片，响应为抗折强度MPa；非重复测量。');db.add(study);db.flush()
+                note=('3温度×2釉层，每格12个随机独立陶瓷试片；其中6片含仪器第2测次，分析先按试片取均值再聚合，样本按独立试片计。' if repeated else '3温度×2釉层，每格20个随机独立陶瓷试片，响应为抗折强度MPa；非重复测量。')
+                study=FactorStudy(code=code,name=name,a_levels=levels_a,b_levels=levels_b,source_file=f'bh-kiln-{code.lower()}.csv',note=note);db.add(study);db.flush()
                 for i,a in enumerate(levels_a):
                     for j,b in enumerate(levels_b):
                         cell=TrialCell(study_id=study.id,temperature=a,glaze=b);db.add(cell);db.flush()
-                        for k in range(20):db.add(TrialReading(study_id=study.id,cell_id=cell.id,specimen_code=f'BH{index+1}-{i+1}{j+1}-{k+1:02d}',strength_mpa=42. if index==2 else round(rng.gauss(means[i][j],1.8),5)))
+                        if repeated:
+                            specimen_n=12
+                            for k in range(specimen_n):
+                                specimen=f'BH4-{i+1}{j+1}-{k+1:02d}';base=round(rng.gauss(means[i][j],1.8),5)
+                                db.add(TrialReading(study_id=study.id,cell_id=cell.id,specimen_code=specimen,measure_no=1,strength_mpa=base))
+                                if k<6:  # 前6片有第2测次
+                                    second=round(rng.gauss(means[i][j],1.8),5)
+                                    db.add(TrialReading(study_id=study.id,cell_id=cell.id,specimen_code=specimen,measure_no=2,strength_mpa=second))
+                        else:
+                            for k in range(20):db.add(TrialReading(study_id=study.id,cell_id=cell.id,specimen_code=f'BH{index+1}-{i+1}{j+1}-{k+1:02d}',strength_mpa=42. if index==2 else round(rng.gauss(means[i][j],1.8),5)))
                 db.commit()
             runname=code+' · 预设全家族分析'
             if not db.scalar(select(FactorRun).where(FactorRun.name==runname)):

@@ -5,5 +5,6 @@ class CellSummary(BaseModel):
     temperature:str
     glaze:str
     n:int
+    raw_reading_count:int
     mean:float
     std:float
