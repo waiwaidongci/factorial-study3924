@@ -1,10 +1,12 @@
 export interface User{id:number;name:string;email:string;role:string}
 export interface Study{id:number;code:string;name:string;a_levels:string[];b_levels:string[];source_file:string;note:string;row_count:number}
-export interface Cell{id?:number;temperature:string;glaze:string;n:number;mean:number;std:number;ci_low?:number;ci_high?:number}
-export interface Reading{id:number;specimen_code:string;temperature:string;glaze:string;strength_mpa:number}
+export interface Cell{id?:number;temperature:string;glaze:string;n:number;raw_reading_count?:number;mean:number;std:number;ci_low?:number;ci_high?:number}
+export interface Reading{id:number;specimen_code:string;measure_no?:number;temperature:string;glaze:string;strength_mpa:number}
+export interface AggregatedReading{specimen_code:string;temperature:string;glaze:string;strength_mpa:number;measure_count:number;measure_nos:number[];raw_values:number[]}
 export interface AnovaRow{term:string;label:string;ss:number;df:number;ms:number|null;f:number|null;p:number|null}
 export interface Contrast{index:number;factor:string;condition_factor:string;condition:string;left:string;right:string;estimate:number;se:number;t:number;p_raw:number;p_holm:number;ci_low:number;ci_high:number;reject_holm:boolean}
-export interface Result{n:number;per_cell:number;a_levels:string[];b_levels:string[];grand_mean:number;mse:number;df_error:number;alpha:number;anova:AnovaRow[];cells:Cell[];contrasts:Contrast[];family_size:number;interaction_detected:boolean;holm_rejections:number;ss_partition_error:number;fingerprint:string;study_name:string;study_code:string;residuals:{specimen_code:string;fitted:number;residual:number}[]}
+export interface AggregationItem{specimen_code:string;temperature:string;glaze:string;measure_count:number;measure_nos:number[];raw_values:number[];mean:number}
+export interface Result{n:number;per_cell:number;a_levels:string[];b_levels:string[];grand_mean:number;mse:number;df_error:number;alpha:number;anova:AnovaRow[];cells:Cell[];contrasts:Contrast[];family_size:number;interaction_detected:boolean;holm_rejections:number;ss_partition_error:number;fingerprint:string;study_name:string;study_code:string;residuals:{specimen_code:string;fitted:number;residual:number;measure_count?:number}[];measure_mode?:'single'|'repeated';raw_reading_count?:number;deduped_reading_count?:number;specimen_count?:number;duplicate_dropped?:number;aggregation?:AggregationItem[]}
 export interface Run{id:number;name:string;study_id:number;alpha:number;contrast_family:string;status:string;error:string;result:Partial<Result>}
 export interface Plan{id:number;title:string;run_id:number;contrast_index:number;action:string;verification:string;status:string;approved_by:string}
 export interface Audit{id:number;actor:string;action:string;status_code:number;created_at:string}
