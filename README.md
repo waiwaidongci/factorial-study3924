@@ -38,7 +38,16 @@ JWT有效8小时，带盐PBKDF2-SHA256密码，独立审计/错误中间件；�
 
 ## 设计与统计口径
 
-每份试验声明温度水平和釉层水平；只接受完整平衡交叉设计，每格至少3个独立观测，试片编号在全试验唯一。固定因子，当前不用于重复测量、随机窑批或不平衡设计。CSV表头为`specimen_code,temperature,glaze,strength_mpa`；强度为有限正数，最多3000行。导入后原数据不修改，需要更正时建立新试验。
+每份试验声明温度水平和釉层水平；只接受完整平衡交叉设计，每格至少3个独立试片，试片编号在全试验唯一（同片多测次以测次号区分）。固定因子；同片仪器复测仅作为试片均值化的输入，不做重复测量方差推断，也不用于随机窑批或不平衡设计。CSV表头为`specimen_code,temperature,glaze,strength_mpa,measure_no`（`measure_no`可选，旧四列表按第1测次处理）；强度为有限正数，原始读数最多3000行。导入后原数据不修改，需要更正时建立新试验。
+
+**仪器复测与试片聚合。** 同一`specimen_code`可带多个`measure_no`，表示同一片独立试片的多个仪器测次；分析先对同片各测次取算术均值，再以试片均值作为唯一观测进入ANOVA。样本数`n`、残差自由度与全部对比均按**独立试片**计，测次行数不会虚增样本，也无需为通过重号校验而改编号。去重与拒收规则：
+
+- 同`(specimen_code, measure_no)`完全同值的重复登记自动去重，仅保留一条，并在结果中报告去重条数；
+- 同`(specimen_code, measure_no)`出现不同强度值 → 数据冲突，整份导入422拒收；
+- 同一试片跨处理格（温度/釉层不一致）→ 整份拒收；
+- 任何拒收都在写库前完成，不残留study/cell/reading任何记录。
+
+数据页提供「原始读数/含测次号」与「试片聚合/均值依据」双视图，结果页可展开每片的测次号、各测次原值与进入分析的均值。
 
 设A有a水平，B有b水平，每格n个观测，处理均值mᵢⱼ、总体均值m、边际均值mᵢ·/m·ⱼ：
 
@@ -58,9 +67,9 @@ Holm将全家族p从小到大排序，按剩余项数乘p后累计取不下降�
 
 ## 复算、边界与seed
 
-完整输入SHA256包含算法版本、试验code、因子水平及顺序、稳定按试片编号排序的所有读数/ID、alpha与固定家族名。源数值和alpha均为MySQL DOUBLE，结果为JSON双精度。缺格、非平衡、每格<3、重复试片、非有限值及零残差方差有真实失败态。
+完整输入SHA256包含算法版本（当前`balanced-fixed-anova-holm-v2`，聚合口径`specimen_mean_v1`）、试验code、因子水平及顺序、稳定按`(试片编号,测次号)`排序的**全部原始读数/ID**（含`measure_no`与每个测次原值）、alpha与固定家族名。因此两片试片均值相同但测次原值不同，指纹必然不同；历史v1运行的结果JSON与指纹原样保留、仍可按v1口径复算。源数值和alpha均为MySQL DOUBLE，结果为JSON双精度。缺格、非平衡、每格独立试片<3、同测次异值、试片跨格、非有限值及零残差方差有真实失败态。
 
-seed固定随机种子117：3独立试验，每个3×2×20=120片，总360片；BH-INT为交互线索、BH-ADD为加性生成对照、BH-CONST为常量边界。前两份实际计算，常量运行保留failed原因。试验code、处理格(study,temp,glaze)、试片(study,code)、运行名、提案标题和账号邮箱为自然键；重复seed不覆盖用户改动。
+seed固定随机种子117：4独立试验——BH-INT/BH-ADD/BH-CONST每格20片（各120条读数），BH-REP每格12片且其中6片含第2仪器测次（108条原始读数聚合为72个独立试片）；BH-INT为交互线索、BH-ADD为加性生成对照、BH-CONST为常量边界。前三份实际计算，常量运行保留failed原因。试验code、处理格(study,temp,glaze)、读数(study,specimen_code,measure_no)、运行名、提案标题和账号邮箱为自然键；重复seed不覆盖用户改动。
 
 ## 页面、实体和共享代码
 
@@ -92,4 +101,8 @@ FactorStudy、TrialCell、TrialReading、FactorRun、FollowupPlan五实体各贯
 | JWT_SECRET | 项目独立签名密钥 |
 | SEED_DEMO | true启动自动seed，失败记录日志且不阻塞API |
 
-本地开发：db/redis启动后，在backend安装requirements、设置DATABASE_URL/REDIS_URL/JWT_SECRET，运行`uvicorn src.main:app --reload`与`python -m src.worker`；前端`npm ci && npm run dev`。/api默认代理19221，本地API用8000时同步调整。测试、截图及TESTING位于批次根`test-artifacts/gb-0017/`。MIT License，见LICENSE。
+本地开发：db/redis启动后，在backend安装requirements、设置DATABASE_URL/REDIS_URL/JWT_SECRET，运行`uvicorn src.main:app --reload`与`python -m src.worker`；前端`npm ci && npm run dev`。/api默认代理19221，本地API用8000时同步调整。后端测试用`pip install -r requirements-dev.txt`后`python -m pytest backend/tests -q`（纯函数+SQLite内存库，不依赖docker）。测试、截图及TESTING位于批次根`test-artifacts/gb-0017/`。MIT License，见LICENSE。
+
+## 数据库升级（v1 → v2 复测支持）
+
+新库由`Base.metadata.create_all`直接创建v2结构。已有v1库先备份再在`factorial`库执行`backend/migrations/002_repeat_measures.sql`（MySQL 8.0，幂等）：为`trial_readings`增加`measure_no INT NOT NULL DEFAULT 1`，自然键由`(study_id,specimen_code)`改为`(study_id,specimen_code,measure_no)`。旧行默认测次1，历史`factor_runs.result`与已获批方案不迁移、不改写。
