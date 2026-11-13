@@ -1,0 +1,3 @@
+import {request,post} from './client';import type {Plan} from '../types/domain';export const getPlans=()=>request<Plan[]>('/plans');export const createPlan=(data:unknown)=>post<Plan>('/plans',data);
+
+export const approvePlan=(id:number)=>request<Plan>('/plans/'+id+'/approve',{method:'PATCH'});export async function downloadPlan(id:number){const r=await fetch(`/api/plans/${id}/export`,{headers:{Authorization:'Bearer '+localStorage.getItem('factorial-token')}});if(!r.ok){const e=await r.json();throw new Error(e.detail);}const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=`beiheng-plan-${id}.csv`;a.click();URL.revokeObjectURL(url);}

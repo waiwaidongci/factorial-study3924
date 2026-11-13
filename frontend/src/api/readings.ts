@@ -1,0 +1,1 @@
+import {request} from './client';import type {Reading} from '../types/domain';export const getReadings=(study:number,cell=0,offset=0)=>request<{total:number;rows:Reading[]}>(`/readings?study_id=${study}&offset=${offset}&limit=20${cell?'&cell_id='+cell:''}`);

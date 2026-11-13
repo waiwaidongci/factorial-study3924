@@ -1,0 +1,1 @@
+import {request,post} from './client';import type {Study} from '../types/domain';export const getStudies=()=>request<Study[]>('/studies');export const createStudy=(data:unknown)=>post<Study>('/studies',data);

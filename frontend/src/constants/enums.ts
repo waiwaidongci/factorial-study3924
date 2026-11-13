@@ -1,0 +1,1 @@
+export const roles:Record<string,string>={admin:'实验负责人',analyst:'材料分析员',viewer:'工艺观察员'};export const statuses:Record<string,string>={queued:'已排队',running:'计算中',completed:'已完成',failed:'不可估 / 失败',draft:'待审批',approved:'已批准'};export const family='all_simple_pairwise';

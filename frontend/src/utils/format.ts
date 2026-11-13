@@ -1,0 +1,1 @@
+export const number=(n:number|undefined|null,d=2)=>n===undefined||n===null?'—':new Intl.NumberFormat('zh-CN',{maximumFractionDigits:d}).format(n);export const probability=(p:number|undefined|null)=>p===undefined||p===null?'—':p===0?'<1e-300':p<.001?p.toExponential(2):p.toFixed(4);
