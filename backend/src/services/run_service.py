@@ -23,7 +23,9 @@ def execute_run(db,id):
     run.status=RunStatus.RUNNING;db.commit()
     try:
         study=db.get(FactorStudy,run.study_id);rows=raw_readings(db,study.id);result=analyze_factorial(rows,study.a_levels,study.b_levels,run.alpha)
-        snapshot={'algorithm':'balanced-fixed-anova-holm-v1','study_code':study.code,'a_levels':study.a_levels,'b_levels':study.b_levels,'rows':rows,'alpha':run.alpha,'contrast_family':run.contrast_family}
+        # 指纹保留含测次号的全部原始读数：原值变化即使试片均值相同，哈希也必然变化
+        fingerprint_rows=sorted(({'specimen_code':r['specimen_code'],'measure_no':r.get('measure_no',1),'temperature':r['temperature'],'glaze':r['glaze'],'strength_mpa':r['strength_mpa']} for r in rows),key=lambda r:(r['specimen_code'],r['measure_no']))
+        snapshot={'algorithm':'balanced-fixed-anova-holm-v2','aggregation_basis':'specimen_mean_v1','study_code':study.code,'a_levels':study.a_levels,'b_levels':study.b_levels,'rows':fingerprint_rows,'alpha':run.alpha,'contrast_family':run.contrast_family}
         result['fingerprint']=hashlib.sha256(json.dumps(snapshot,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest();result['study_name']=study.name;result['study_code']=study.code
         run.result=result;run.status=RunStatus.COMPLETED;run.error='';db.commit()
     except Exception as exc:
